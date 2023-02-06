@@ -16,7 +16,9 @@ fn main() {
         .window_setup(WindowSetup::default().title("3D Renderer"))
         .window_mode(WindowMode::default().dimensions(WIN_WIDTH, WIN_HEIGHT));
     let (mut ctx, event_loop) = cb.build().expect("Could not create ggez context!");
-    let rd = Renderer::new(&mut ctx);
+    let mut rd = Renderer::new(&mut ctx);
+
+    rd.mesh.merge_tris(Mesh::cube(Vec3d::origin(), 1.0));
 
     event::run(ctx, event_loop, rd);
 }
@@ -24,26 +26,28 @@ fn main() {
 struct Renderer {
     mesh: Mesh,
     proj: Mat4x4,
-    pos: Vec3d,
-    theta: f64,
+    theta: f32,
+    light_dir: Vec3d,
+    camera: Vec3d,
 }
 
 impl Renderer {
     pub fn new(_ctx: &mut Context) -> Renderer {
-        let near = 1f64;
-        let far = 1000f64;
-        let fov = 90f64;
-        let fov_rad = 1f64 / (fov * 0.5f64 / 180f64 * std::f64::consts::PI).tan();
-        let ar = (WIN_HEIGHT / WIN_WIDTH) as f64;
+        let near = 1.0;
+        let far = 1000.0;
+        let fov = 90.0;
+        let fov_rad = 1.0 / (fov * 0.5 / 180.0 * std::f32::consts::PI).tan();
+        let ar = WIN_HEIGHT / WIN_WIDTH;
         Renderer {
-            mesh: Mesh::new_unit_cube(),
+            mesh: Mesh::new(),
             proj: Mat4x4(
                 (ar * fov_rad, 0.0, 0.0, 0.0),
                 (0.0, fov_rad, 0.0, 0.0),
                 (0.0, 0.0, far / (far - near), 1.0),
                 (0.0, 0.0, (-far * near) / (far - near), 0.0),
             ),
-            pos: Vec3d::new(0.0, 0.0, 3.0),
+            light_dir: Vec3d::new(0.0, 0.0, -1.0),
+            camera: Vec3d::new(0.0, 0.0, 0.0),
             theta: 0.0,
         }
     }
@@ -51,7 +55,7 @@ impl Renderer {
 
 impl EventHandler for Renderer {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        self.theta = self.theta + 0.02; // % (2.0 * std::f64::consts::PI);
+        self.theta = self.theta + 0.02; // % (2.0 * std::f32::consts::PI);
         Ok(())
     }
 
@@ -59,51 +63,74 @@ impl EventHandler for Renderer {
         let rot_x = Mat4x4::rot_x(self.theta * 0.5);
         let rot_z = Mat4x4::rot_z(self.theta);
         let rot = Mat4x4::mult(&rot_z, &rot_x);
+        let scale = Vec3d::new(0.5 * WIN_WIDTH, 0.5 * WIN_HEIGHT, 1.0);
+        let light_dir = self.light_dir.normalise();
         let mb = &mut graphics::MeshBuilder::new();
 
-        // Project triangles
-        for tri in &self.mesh.tris {
-            // Rotate
-            let mut tri_trans = Triangle::new(
-                Vec3d::mult_mat(&tri.vertices.0, &rot),
-                Vec3d::mult_mat(&tri.vertices.1, &rot),
-                Vec3d::mult_mat(&tri.vertices.2, &rot),
-            );
+        for o_tri in &mut self.mesh.tris {
+            let mut tri = o_tri.copy();
 
-            // Translate
-            tri_trans.vertices.0.add(&self.pos);
-            tri_trans.vertices.1.add(&self.pos);
-            tri_trans.vertices.2.add(&self.pos);
+            // Rotate and translate
+            tri.vertices.0 = Vec3d::mult_mat(&tri.vertices.0, &rot);
+            tri.vertices.1 = Vec3d::mult_mat(&tri.vertices.1, &rot);
+            tri.vertices.2 = Vec3d::mult_mat(&tri.vertices.2, &rot);
+            // Offset
+            tri.vertices.0.z += 3.0;
+            tri.vertices.1.z += 3.0;
+            tri.vertices.2.z += 3.0;
 
-            let mut tri_proj = Triangle::new(
-                Vec3d::mult_mat(&tri_trans.vertices.0, &self.proj),
-                Vec3d::mult_mat(&tri_trans.vertices.1, &self.proj),
-                Vec3d::mult_mat(&tri_trans.vertices.2, &self.proj),
-            );
+            // Calculate the normal
+            let normal = tri.normal().normalise();
 
-            tri_proj.vertices.0.addk(1.0);
-            tri_proj.vertices.1.addk(1.0);
-            tri_proj.vertices.2.addk(1.0);
+            // Check if triangle is visible - less than 90deg to the camera
+            let cam_ray = tri.vertices.0.sub(&self.camera);
+            if Vec3d::dot_product(&normal, &cam_ray) < 0.0 {
+                // Illumination
+                let lum = Vec3d::dot_product(&normal, &light_dir).max(0.1) as f32;
 
-            tri_proj.vertices.0.x *= 0.5 * WIN_WIDTH as f64;
-            tri_proj.vertices.0.y *= 0.5 * WIN_HEIGHT as f64;
-            tri_proj.vertices.1.x *= 0.5 * WIN_WIDTH as f64;
-            tri_proj.vertices.1.y *= 0.5 * WIN_HEIGHT as f64;
-            tri_proj.vertices.2.x *= 0.5 * WIN_WIDTH as f64;
-            tri_proj.vertices.2.y *= 0.5 * WIN_HEIGHT as f64;
+                // Project the triangle
+                tri.vertices.0 = Vec3d::mult_mat(&tri.vertices.0, &self.proj);
+                tri.vertices.1 = Vec3d::mult_mat(&tri.vertices.1, &self.proj);
+                tri.vertices.2 = Vec3d::mult_mat(&tri.vertices.2, &self.proj);
+    
+                tri.vertices.0 = tri.vertices.0.addk(1.0).mul(&scale);
+                tri.vertices.1 = tri.vertices.1.addk(1.0).mul(&scale);
+                tri.vertices.2 = tri.vertices.2.addk(1.0).mul(&scale);
+    
+                // Get points
+                let vs = [
+                    vec2(tri.vertices.0.x as f32, tri.vertices.0.y as f32),
+                    vec2(tri.vertices.1.x as f32, tri.vertices.1.y as f32),
+                    vec2(tri.vertices.2.x as f32, tri.vertices.2.y as f32),
+                    vec2(tri.vertices.0.x as f32, tri.vertices.0.y as f32),
+                ];
+    
+                // Fill
+                if tri.fill.is_some() {
+                    // Apply brightness
+                    let mut rgb = tri.fill.unwrap();
+                    let mut hsl: colorsys::Hsl = rgb.as_ref().into();
+                    hsl.set_lightness((lum as f64) * 50.0);
+                    rgb = hsl.as_ref().into();
 
-            let vs = [
-                vec2(tri_proj.vertices.0.x as f32, tri_proj.vertices.0.y as f32),
-                vec2(tri_proj.vertices.1.x as f32, tri_proj.vertices.1.y as f32),
-                vec2(tri_proj.vertices.2.x as f32, tri_proj.vertices.2.y as f32),
-                vec2(tri_proj.vertices.0.x as f32, tri_proj.vertices.0.y as f32),
-            ];
+                    mb.polyline(
+                        graphics::DrawMode::fill(),
+                        &vs,
+                        // graphics::Color::new(lum, lum, lum, 1.0),
+                        Color::new((rgb.red() / 255.0) as f32, (rgb.green() / 255.0) as f32, (rgb.blue() / 255.0) as f32, 1.0),
+                    )?;
+                }
 
-            mb.line(
-                &vs,
-                2.0,
-                Color::WHITE,
-            )?;
+                // Stroke
+                if tri.stroke.is_some() {
+                    let rgb = tri.stroke.unwrap();
+                    mb.polyline(
+                        graphics::DrawMode::stroke(2.0),
+                        &vs,
+                        Color::new((rgb.red() / 255.0) as f32, (rgb.green() / 255.0) as f32, (rgb.blue() / 255.0) as f32, 1.0),
+                    )?;
+                }
+            }
         }
 
         let mesh = graphics::Mesh::from_data(ctx, mb.build());
