@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ggez = "0.8.1"
+ggez = { git = "https://github.com/jazzfool/ggez", branch = "devel" }
 colorsys = "0.6.7"

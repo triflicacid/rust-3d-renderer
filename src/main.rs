@@ -4,21 +4,29 @@ use ggez::graphics::{self, Color};
 use ggez::{Context, ContextBuilder, GameResult};
 use ggez::glam::*;
 
-mod util;
-pub use crate::util::*;
+mod lib;
+pub use lib::mesh::{Mesh, create};
+pub use lib::maths::mat::Mat4x4;
+pub use lib::maths::vec::Vec3d;
 
-const WIN_WIDTH: f32 = 1440.0;
-const WIN_HEIGHT: f32 = 960.0;
+const WIN_WIDTH: f32 = 1090.0;
+const WIN_HEIGHT: f32 = 720.0;
 
 fn main() {
     // Make a Context.
-    let cb = ContextBuilder::new("3D Rendered", "Ruben Saunders")
+    let cb = ContextBuilder::new("3D Renderer", "triflicAcid")
         .window_setup(WindowSetup::default().title("3D Renderer"))
         .window_mode(WindowMode::default().dimensions(WIN_WIDTH, WIN_HEIGHT));
     let (mut ctx, event_loop) = cb.build().expect("Could not create ggez context!");
     let mut rd = Renderer::new(&mut ctx);
 
-    rd.mesh.merge_tris(Mesh::cube(Vec3d::origin(), 1.0));
+    let mut cube = Mesh::from(create::cube(Vec3d::origin(), 1.0));
+    cube.fill(Some(colorsys::Rgb::new(1.0, 0.0, 0.0, None)));
+    rd.mesh.merge(cube);
+    
+    cube = Mesh::from(create::cube(Vec3d::origin().add_x(2.0), 1.0));
+    cube.fill(Some(colorsys::Rgb::new(0.0, 1.0, 0.5, None)));
+    rd.mesh.merge(cube);
 
     event::run(ctx, event_loop, rd);
 }
@@ -60,9 +68,9 @@ impl EventHandler for Renderer {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        let rot_x = Mat4x4::rot_x(self.theta * 0.5);
-        let rot_z = Mat4x4::rot_z(self.theta);
-        let rot = Mat4x4::mult(&rot_z, &rot_x);
+        // let rot_x = Mat4x4::rot_x(self.theta * 0.5);
+        // let rot_z = Mat4x4::rot_z(self.theta);
+        // let rot = Mat4x4::mult(&rot_z, &rot_x);
         let scale = Vec3d::new(0.5 * WIN_WIDTH, 0.5 * WIN_HEIGHT, 1.0);
         let light_dir = self.light_dir.normalise();
         let mb = &mut graphics::MeshBuilder::new();
@@ -71,9 +79,10 @@ impl EventHandler for Renderer {
             let mut tri = o_tri.copy();
 
             // Rotate and translate
-            tri.vertices.0 = Vec3d::mult_mat(&tri.vertices.0, &rot);
-            tri.vertices.1 = Vec3d::mult_mat(&tri.vertices.1, &rot);
-            tri.vertices.2 = Vec3d::mult_mat(&tri.vertices.2, &rot);
+            // tri.vertices.0 = Vec3d::mult_mat(&tri.vertices.0, &rot);
+            // tri.vertices.1 = Vec3d::mult_mat(&tri.vertices.1, &rot);
+            // tri.vertices.2 = Vec3d::mult_mat(&tri.vertices.2, &rot);
+
             // Offset
             tri.vertices.0.z += 3.0;
             tri.vertices.1.z += 3.0;
