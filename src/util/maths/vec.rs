@@ -1,10 +1,16 @@
-use crate::lib::maths::mat::Mat4x4;
+use crate::util::maths::mat::Mat4x4;
 
 // 3 dimensional vector
 pub struct Vec3d {
     pub x: f32,
     pub y: f32,
     pub z: f32,
+}
+
+impl Clone for Vec3d {
+    fn clone(&self) -> Self {
+        Vec3d::new(self.x, self.y, self.z)
+    }
 }
 
 impl Vec3d {
@@ -18,9 +24,9 @@ impl Vec3d {
         Vec3d::new(k, k, k)
     }
 
-    /// Copy
-    pub fn copy(&mut self) -> Vec3d {
-        Vec3d::new(self.x, self.y, self.z)
+    /// Is this equal to the given vertex?
+    pub fn equals(&self, other: &Vec3d) -> bool {
+        return self.x == other.x && self.y == other.y && self.z == other.z;
     }
 
     /// Return the origin
@@ -49,7 +55,7 @@ impl Vec3d {
     }
 
     /// Add a scalar and self
-    pub fn addk(&mut self, k: f32) -> Vec3d {
+    pub fn addk(&self, k: f32) -> Vec3d {
         Vec3d::new(
             self.x + k,
             self.y + k,
@@ -58,7 +64,7 @@ impl Vec3d {
     }
 
     /// Add to x component
-    pub fn add_x(&mut self, x: f32) -> Vec3d {
+    pub fn add_x(&self, x: f32) -> Vec3d {
         Vec3d::new(
             self.x + x,
             self.y,
@@ -67,7 +73,7 @@ impl Vec3d {
     }
 
     /// Add to y component
-    pub fn add_y(&mut self, y: f32) -> Vec3d {
+    pub fn add_y(&self, y: f32) -> Vec3d {
         Vec3d::new(
             self.x,
             self.y + y,
@@ -76,7 +82,7 @@ impl Vec3d {
     }
 
     /// Add to x component
-    pub fn add_z(&mut self, z: f32) -> Vec3d {
+    pub fn add_z(&self, z: f32) -> Vec3d {
         Vec3d::new(
             self.x,
             self.y,
@@ -85,7 +91,7 @@ impl Vec3d {
     }
 
     /// Add vector and self
-    pub fn add(&mut self, vec: &Vec3d) -> Vec3d {
+    pub fn add(&self, vec: &Vec3d) -> Vec3d {
         Vec3d::new(
             self.x + vec.x,
             self.y + vec.y,
@@ -94,7 +100,7 @@ impl Vec3d {
     }
 
     /// Subtract a vector from self
-    pub fn sub(&mut self, vec: &Vec3d) -> Vec3d {
+    pub fn sub(&self, vec: &Vec3d) -> Vec3d {
         Vec3d::new(
             self.x - vec.x,
             self.y - vec.y,
@@ -103,7 +109,7 @@ impl Vec3d {
     }
 
     /// Multiple self by a vector (x' = x1 * x2, ...)
-    pub fn mul(&mut self, vec: &Vec3d) -> Vec3d {
+    pub fn mul(&self, vec: &Vec3d) -> Vec3d {
         Vec3d::new(
             self.x * vec.x,
             self.y * vec.y,
@@ -112,7 +118,7 @@ impl Vec3d {
     }
 
     /// Multiply self by a scalar
-    pub fn mulk(&mut self, k: f32) -> Vec3d {
+    pub fn mulk(&self, k: f32) -> Vec3d {
         Vec3d::new(
             self.x * k,
             self.y * k,
@@ -154,12 +160,12 @@ impl Vec3d {
     }
 
     /// Return length of self
-    pub fn length(&mut self) -> f32 {
+    pub fn length(&self) -> f32 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
 
     /// Return a normalised varient of this vector
-    pub fn normalise(&mut self) -> Vec3d {
+    pub fn normalise(&self) -> Vec3d {
         let length = self.length();
         Vec3d::new(self.x / length, self.y / length, self.z / length)
     }
